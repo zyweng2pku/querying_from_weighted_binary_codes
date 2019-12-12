@@ -34,7 +34,9 @@ $ accuracy with bit 32 and neighbor 100: 0.53894
 
 ## Reference ##
 [1] Norouzi, M.; Punjani, A.; and Fleet, D. J. 2014. Fast exact search in hamming space with multi-index hashing. IEEE Trans. on Pattern Anal. and Mach. Intell. 36(6):1107–1119.
+
 [2] Heo J.; Lee Y.; He J.; Chang S.; Yoon s. 2015. Spherical Hashing: Binary Code Embedding with Hyperspheres. IEEE Trans. on Pattern Anal. and Mach. Intell. 37(11):2304-2316.
+
 [3] Weng, Z.; Yao, W.; Sun, Z.; and Zhu, Y. 2016. Asymmetric distance for spherical hashing. In Proceedings of the IEEE International Conference on Image Processing, 206–210. 
 
 Please cite:
