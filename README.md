@@ -1,6 +1,6 @@
 # Efficient querying from weighted binary codes
 This repository contains the C++ code for the query method proposed in our paper:
-"Efficient Querying from Weighted Binary Codes". Zhenyu Weng, Yuesheng Zhu. AAAI 2020(oral).
+"Efficient Querying from Weighted Binary Codes". Zhenyu Weng, Yuesheng Zhu. AAAI 2020(poster).
 
 ## Overview ##
 This method is a fast nearest neighbor search method for weighted binary codes based on the multi-index tables[1].
