@@ -14,15 +14,15 @@ Data Dir:
 
 Command: 
 Building
-''' 
+``` 
 $ g++ array32.cpp -c
 $ g++ bucket_group.cpp -c
 $ g++ sparse_hashtable.cpp -c
 $ g++ MIWQ.cpp -c
 $ g++ array32.o bucket_group.o sparse_hashtable.o MIWQ.o -o MIWQ
-'''
+```
 Then running MIWQ and using pre.cpp file to check the precision.
-'''
+```
 $ file name:data/groundtruth.txt
 $ file name:32\MIWQ32_1_4_1000000_10000
 $ accuracy with bit 32 and neighbor 1: 0.74040
@@ -30,7 +30,7 @@ $ file name:32\MIWQ32_10_4_1000000_10000
 $ accuracy with bit 32 and neighbor 10: 0.67392
 $ file name:32\MIWQ32_100_4_1000000_10000
 $ accuracy with bit 32 and neighbor 100: 0.53894
-'''
+```
 
 ## Reference ##
 Please cite:
