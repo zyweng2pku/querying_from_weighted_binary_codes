@@ -41,7 +41,7 @@ $ accuracy with bit 32 and neighbor 100: 0.53894
 
 Please cite:
 ```
-@proceeding{weng2020querying,
+@proceedings{weng2020querying,
   title={Efficient Querying From Weighted Binary Codes},
   author={Zhenyu Weng, Yuesheng Zhu},
   booktitle={AAAI},
