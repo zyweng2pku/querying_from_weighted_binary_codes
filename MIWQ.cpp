@@ -22,16 +22,24 @@ using namespace std;
 typedef unsigned char byte;
 
 
+char sFileDir[] = "data/gist1m/itq-e/\0";
+//gist1m
 const int nNumData = 1000000; // the scale of database
-const int nNumQuery = 10000; // the number of the queries
+const int nNumQuery = 1000; // the number of the queries
+
+//places205
+//const int nNumData = 1025000; // the scale of database
+//const int nNumQuery = 10250; // the number of the queries
+
+
 const int nSubBit = 8; // every 8 bits are encoded in form of byte
 const int nMinNumTruth = 1; // the range of the number of the retrieved data points [nMinNumTruth, nMaxNumTruth]
 const int nMaxNumTruth = 100;
 
 char sFileName[100];
-char sFileDir[100];
 char sFileFull[100];
-int nChunksNum = 2; // global variable, the number of the tables
+char sOutputDir[100];
+int nChunksNum; // global variable, the number of the tables
 int nMapOri[10001];  // order of the bits, usually is equal to the number of bits plus one 
 
 
@@ -80,7 +88,8 @@ set<UINT64> sTableCounter[16]; // assume there are 16 tables in the extreme case
 
 	
 bool compare_dist(HammingDistIdx itemA, HammingDistIdx itemB) { return (itemA.dDist < itemB.dDist); }
-	
+
+
 // calculate the delta weight	
 void cal_sort_weight(const double* pWeight, const int nBits, double* dWeightDiff, byte* query, int m, int mplus) {
 	double* dWeight = (double*)malloc(2 * nBits * sizeof(double));
@@ -210,7 +219,10 @@ void insert_heap(double x, UINT32 y, int size) {
 	
 void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const double* pWeight,
 	const int nNumData, const int nNumQuery, const int nBits, const int nNumTruth, UINT32* pNumSuccess, 
-	SparseHashtable* H, bitarray* counter, const int mplus, UINT32* pCandidate, UINT32* pBucket) {
+	SparseHashtable* H, bitarray* counter, const int mplus, UINT32* pCandidate, UINT32* pBucket, UINT32* pCandidate1) {
+		
+	TableNode NodeArray[16];
+		
 		
 	UINT64 ii;
 	UINT32 *arr;
@@ -245,11 +257,13 @@ void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const do
 	pQuery = (EntryType*) pQueryBin;
 	
 	for (int idx_query = 0; idx_query < nNumQuery; idx_query++)	{
+//	for (int idx_query = 0; idx_query < 1; idx_query++)	{
 
 		int nRadius = 0;
 		int iter = 0;
 		int nHeapCnt = 0;
 		UINT32 nCand = 0;
+		UINT32 nCand1 = 0;
 		
 		UINT8* pQuerySec = (UINT8*)pQuery;
 		for (int j = 0; j < nBits/nSubBit; j++)
@@ -350,15 +364,20 @@ void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const do
 		
 			// sort the table according to the delta f
 			for (int i = 0; i < m; i++)
+			    NodeArray[TableOrder[i]] = TableQue[TableOrder[i]].top();
+			
+			for (int i = 0; i < m; i++)
 				for (int j = i+1; j < m; j++) {
-					TableNode mm = TableQue[TableOrder[i]].top();
-					TableNode nn = TableQue[TableOrder[j]].top();
+					TableNode mm = NodeArray[TableOrder[i]];
+					TableNode nn = NodeArray[TableOrder[j]];
 					if (mm.dValue - TableNodes[TableOrder[i]].dValue > nn.dValue - TableNodes[TableOrder[j]].dValue) {
 						int tt = TableOrder[i];
 						TableOrder[i] = TableOrder[j];
 						TableOrder[j] = tt;
 					}
 				}
+			
+				
 		
 			for (int i = 0; i < m; i++) {
 				int k = TableOrder[i];
@@ -371,10 +390,19 @@ void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const do
 				
 				TableNode nn = TableNodes[k];
 				nRadius++;
+
+				dDiff -= nn.dValue;
+				dDiff += NodeArray[k].dValue;		
+				
 				arr = H[k].query(chunksk ^ nn.nInd, &size); // lookup
+				
+
+				
+				
 				if (size) {			// the corresponding bucket is not empty
 					for (int c = 0; c < size; c++) {
 						UINT32 index = arr[c];
+						nCand1++;
 						
 						if (!counter->get(index)) { // if it is not a duplicate
 							counter->set(index);
@@ -397,24 +425,28 @@ void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const do
 								if (nHeapCnt == nNumTruth)
 									build_heap(nNumTruth);
 							}
-
+							if (nHeapCnt == nNumTruth) {
+								if (HeapNode[1].dValue <= dDiff) {
+									pCandidate[idx_query] = nCand;
+									pCandidate1[idx_query] = nCand1;
+									pBucket[idx_query] = nRadius;
+									n = nNumTruth;
+									break;
+								}
+							}		
 						}
 					}
 				}
 			
-			
-				dDiff -= nn.dValue;
-				nn = TableQue[k].top();
-				dDiff += nn.dValue;
-				if (nHeapCnt == nNumTruth) {
-					if (HeapNode[1].dValue <= dDiff) {
-						pCandidate[idx_query] = nCand;
-						pBucket[idx_query] = nRadius;
-						n = nNumTruth;
-						break;
-					}
-				}		
+				if (n == nNumTruth)
+					break;	
+		
 			}
+			
+
+			
+	
+			
 		}		
 			
 		for (int i = 1; i <= nHeapCnt; i++) {
@@ -428,7 +460,6 @@ void asym_search_otherbits(const byte* pDataBin, const byte* pQueryBin, const do
 	
 		for (int i = 0; i < nNumTruth; i++)	{
 			*pNumSuccess ++ = pHammingDist[i].nIdx;
-			//printf("%d th query: %d item, %d, %lf\n", idx_query + 1, i + 1, pHammingDist[i].nIdx + 1, pHammingDist[i].dDist);
 		}
 		
 		pQuery += nBits / nOffBits;
@@ -495,7 +526,7 @@ void write_radius_file(char sFileName[], UINT32* pBucket) {
 void read_weight_file(char sFileName[], double* pWeight, int nBits)
 {
 	// for binary file
-	/* 
+	 
 
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
@@ -507,21 +538,20 @@ void read_weight_file(char sFileName[], double* pWeight, int nBits)
 	
 	int n;
 	double f;
-	for (int i = 0; i < nBits; i++) {
-
-		for (int j = 0; j < 2; j++) {
-			if(fread(&f, sizeof(double), 1, fp)!=1) {
-				printf("fail to write the file\n");  
-				exit(0);
-			}
-			pWeight[i * 2 + j] = f;
-		}
-	}
+	for (int k = 0; k < nNumQuery; k++)
+		for (int i = 0; i < nBits; i++)
+			for (int j = 0; j < 2; j++) {
+				if(fread(&f, sizeof(double), 1, fp)!=1) {
+					printf("fail to write the file\n");  
+					exit(0);
+				}
+				pWeight[k * nBits * 2 + i * 2 + j] = f;
+			}	
 	fclose(fp);	
-	*/
+	
 	
 	// for text file
-	
+	/*
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
 	fp=fopen(sFileName, "r"); 
@@ -539,14 +569,14 @@ void read_weight_file(char sFileName[], double* pWeight, int nBits)
 				pWeight[k * nBits * 2 + i * 2 + j] = f;
 			}
 	fclose(fp);		
-	
+	*/	
 }
 
 void read_data_file(char sFileName[], byte* pDataBin, int nBytes)
 {
 
 	// for binary file
-    /*
+    
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
 	fp=fopen(sFileName, "rb"); 
@@ -571,9 +601,10 @@ void read_data_file(char sFileName[], byte* pDataBin, int nBytes)
 		}
 	}
 	fclose(fp);	
-	*/
+	
 	
 	// for text file
+	/*
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
 	fp=fopen(sFileName, "r"); 
@@ -593,14 +624,14 @@ void read_data_file(char sFileName[], byte* pDataBin, int nBytes)
 		}
 	}
 	fclose(fp);		
-	
+	*/
 }
 
 void read_query_file(char sFileName[], byte* pQueryBin, int nBytes)
 {
 
 	// for binary file
-    /*
+    
 
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
@@ -626,8 +657,9 @@ void read_query_file(char sFileName[], byte* pQueryBin, int nBytes)
 		}
 	}
 	fclose(fp);	
-	*/
+	
 	// for text file
+	/*
 	printf("file name:%s\n", sFileName);
 	FILE* fp;
 	fp=fopen(sFileName, "r"); 
@@ -646,7 +678,7 @@ void read_query_file(char sFileName[], byte* pQueryBin, int nBytes)
 		}
 	}
 	fclose(fp);		
-	
+	*/
 }
 
 
@@ -667,13 +699,21 @@ void write_time_file(char sFileName[], double dTime)
 
 	
 
-int main()
+int main(int argc, char* argv[])
 {
+	int nByte = 32;
+	if (argc >= 2) {
+		nByte = atoi(argv[1]);
+		printf("bit number: %d\n", nByte);
+	}
+	
+	
 	UINT64 ii;
-	for (int nBytes = 4; nBytes >= 4; nBytes /= 2) {
+	for (int nBytes = 2; nBytes <= 2; nBytes *= 2) {
+		nBytes = nByte / 8;
 		int nBits = nBytes * 8;
-		int nSt = nBits / 8; // the range of the length of substrings, CIFAR-10: nbits / 8, GIST1M: nbits / 16
-		int nEd = nBits / 8;
+		int nSt = nBits / 16; // the range of the length of substrings, CIFAR-10: nbits / 8, GIST1M: nbits / 16
+		int nEd = nBits / 16;
 		for (int f = nSt; f >= nEd; f--) {
 			nChunksNum = f;
 			double* pWeight = (double*)malloc(nBits * 2 * nNumQuery * sizeof(double));
@@ -682,19 +722,19 @@ int main()
 			byte* pDataBin = (byte*)malloc(ii);
 			byte* pQueryBin = (byte*)malloc(nNumQuery * nBytes * sizeof(byte));
 		
-			strcpy(sFileDir, "\0");
+			
 
-			sprintf(sFileName, "data/weight%d.txt\0", nBits);
+			sprintf(sFileName, "bit_weight%d\0", nBits);
 			strcpy(sFileFull, sFileDir);
 			strcat(sFileFull, sFileName);
 			read_weight_file(sFileFull, pWeight, nBits);
 	
-			sprintf(sFileName, "data/databin%d.txt\0", nBits);
+			sprintf(sFileName, "databin%d\0", nBits);
 			strcpy(sFileFull, sFileDir);
 			strcat(sFileFull, sFileName);
 			read_data_file(sFileFull, pDataBin, nBytes);
 	
-			sprintf(sFileName, "data/testbin%d.txt\0", nBits);
+			sprintf(sFileName, "querybin%d\0", nBits);
 			strcpy(sFileFull, sFileDir);
 			strcat(sFileFull, sFileName);
 			read_query_file(sFileFull, pQueryBin, nBytes);
@@ -762,10 +802,14 @@ int main()
 				}
 			}		
 		
+		    //pause to record the memory
+	
+		
 			printf("size of table: %d\n", sizeof(H[0]));
 			for (int nNumTruth = nMinNumTruth; nNumTruth <= nMaxNumTruth; nNumTruth *= 10) { // return different numbers of data points
 				UINT32* pNumSuccess = (UINT32*)malloc(nNumQuery * nNumTruth * sizeof(UINT32));
 				UINT32* pCandidate = (UINT32*)malloc(nNumQuery * sizeof(UINT32));
+				UINT32* pCandidate1 = (UINT32*)malloc(nNumQuery * sizeof(UINT32));
 				UINT32* pBucket = (UINT32*)malloc(nNumQuery * sizeof(UINT32));
 				clock_t tSt, tEd;
 				
@@ -773,37 +817,73 @@ int main()
 				tSt = clock();
 				if (nBits % 8 == 0)	{
 					printf("begin query\n");
-					asym_search_otherbits(pDataBin, pQueryBin, pWeight, nNumData, nNumQuery, nBits, nNumTruth, pNumSuccess, H, counter, mplus, pCandidate, pBucket);
+					asym_search_otherbits(pDataBin, pQueryBin, pWeight, nNumData, nNumQuery, nBits, nNumTruth, pNumSuccess, H, counter, mplus, pCandidate, pBucket, pCandidate1);
 				} else printf("Wrong bit number\n");
 				tEd = clock();
 				dSortTime = (double)(tEd - tSt) / CLOCKS_PER_SEC;
-
+				
 				printf("query time: %.5lf\n", dSortTime / nNumQuery);
 				
-				sprintf(sFileDir, "%d\\\0", nBits);
-				sprintf(sFileName, "MIWQ%d_%d_%d_%d_%d\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
-				strcpy(sFileFull, sFileDir);
+				sprintf(sOutputDir, "%s%d/\0", sFileDir, nBits);
+				sprintf(sFileName, "MIWQ_v1%d_%d_%d_%d_%d\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
 				strcat(sFileFull, sFileName);
 				write_file(sFileFull, pNumSuccess, nNumTruth);
 
-				sprintf(sFileName, "time_MIWQ%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
-				strcpy(sFileFull, sFileDir);
+				sprintf(sFileName, "time_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
 				strcat(sFileFull, sFileName);
 				write_time_file(sFileFull, dSortTime / nNumQuery);
 				
-				sprintf(sFileName, "candidate_MIWQ%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
-				strcpy(sFileFull, sFileDir);
+				sprintf(sFileName, "candidate_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
 				strcat(sFileFull, sFileName);
 				write_candidate_file(sFileFull, pCandidate);
 				
-				sprintf(sFileName, "bucket_MIWQ%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
-				strcpy(sFileFull, sFileDir);
+				sprintf(sFileName, "bucket_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
 				strcat(sFileFull, sFileName);
 				write_radius_file(sFileFull, pBucket);
 
+				sprintf(sFileName, "ori_candidate_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
+				strcat(sFileFull, sFileName);
+				write_candidate_file(sFileFull, pCandidate1);
+
+
+                double ave = 0;
+				for (int iQuery = 0; iQuery < nNumQuery; iQuery++) {
+					ave += pCandidate[iQuery];
+				}
+				ave /= nNumQuery;
+				sprintf(sFileName, "ave_candidate_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
+				strcat(sFileFull, sFileName);
+				write_time_file(sFileFull, ave);
+
+				ave = 0;
+				for (int iQuery = 0; iQuery < nNumQuery; iQuery++) {
+					ave += pCandidate1[iQuery];
+				}
+				ave /= nNumQuery;
+				sprintf(sFileName, "ave_ori_candidate_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
+				strcat(sFileFull, sFileName);
+				write_time_file(sFileFull, ave);
+
+				ave = 0;
+				for (int iQuery = 0; iQuery < nNumQuery; iQuery++) {
+					ave += pBucket[iQuery];
+				}
+				ave /= nNumQuery;
+				sprintf(sFileName, "ave_bucket_MIWQ_v1%d_%d_%d_%d_%d.txt\0", nBits, nNumTruth, nChunksNum, nNumData, nNumQuery); 
+				strcpy(sFileFull, sOutputDir);
+				strcat(sFileFull, sFileName);
+				write_time_file(sFileFull, ave);
 				
 				free(pNumSuccess);
 				free(pCandidate);
+				free(pCandidate1);
 				free(pBucket);
 			}
 			delete [] H;
@@ -818,4 +898,3 @@ int main()
 	}
 	return 0;
 }
-
