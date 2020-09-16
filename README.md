@@ -22,7 +22,7 @@ $ g++ sparse_hashtable.cpp -c
 $ g++ MIWQ.cpp -c
 $ g++ array32.o bucket_group.o sparse_hashtable.o MIWQ.o -o MIWQ
 ```
-Then running FSWBC bit_number(optional) and find the time file in data\gist1m\itq-e\32.
+Then running MIWQ bit_number(optional) and find the time file in data\gist1m\itq-e\32.
 ```
 
 ## Reference ##
