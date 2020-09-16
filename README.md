@@ -23,7 +23,7 @@ $ g++ MIWQ.cpp -c
 $ g++ array32.o bucket_group.o sparse_hashtable.o MIWQ.o -o MIWQ
 ```
 Then running MIWQ bit_number(optional) and find the time file in data\gist1m\itq-e\32.
-```
+
 
 ## Reference ##
 [1] Norouzi, M.; Punjani, A.; and Fleet, D. J. 2014. Fast exact search in hamming space with multi-index hashing. IEEE Trans. on Pattern Anal. and Mach. Intell. 36(6):1107–1119.
